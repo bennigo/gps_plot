@@ -1,0 +1,22 @@
+#!/bin/bash
+###############################################################
+#
+#  Breyta eps yfir í png
+#
+#   2015-01-15 bgo@vedur.is 
+###############################################################
+
+
+#######################################################
+PSFILE=$1
+BASE=`basename "$PSFILE" .eps`
+
+logodir="${HOME}/git/gps/postprocessing/matplotlib-based/logos/"
+
+convert -density 90 -flatten  $PSFILE ${BASE}1.png
+convert -trim ${BASE}1.png ${BASE}.png
+
+##########################################################
+# clean up the mess
+#########################################################
+rm -f ${BASE}1.png 

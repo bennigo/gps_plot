@@ -1,0 +1,26 @@
+#!/bin/bash
+###############################################################
+#
+#  Breyta eps yfir í png
+#
+#   2015-01-15 bgo@vedur.is 
+###############################################################
+
+
+#######################################################
+PSFILE=$1
+BASE=`basename "$PSFILE" .eps`
+
+logodir="${HOME}/git/gps/postprocessing/matplotlib-based/logos/"
+
+convert -density 300  -density 90 -flatten  $PSFILE ${BASE}1.png
+convert -trim ${BASE}1.png ${BASE}2.png
+#+112+12
+composite -compose atop -gravity NorthEast -geometry +850+0180  ${logodir}vi_logos/vi_logo.png ${BASE}2.png ${BASE}.png
+#composite -compose atop -gravity NorthEast -geometry +640+1205 ${logodir}HI_merki2.png ${BASE}2.png ${BASE}3.png
+#composite -compose atop -gravity NorthEast -geometry +180+110 ${logodir}gns_logo.png ${BASE}3.png ${BASE}.png
+
+##########################################################
+# clean up the mess
+#########################################################
+rm -f ${BASE}1.png ${BASE}2.png #${BASE}3.png

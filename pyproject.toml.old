@@ -1,0 +1,49 @@
+[tool.poetry]
+name='timesmatplt'
+version = "0.2"
+authors = [
+    "Benedikt Gunnar Ófeigsson <bgo@vedur.is>",
+]
+description='Time and date modules capable of handling GPS time',
+
+readme = "README.md"
+classifiers = [
+    "Programming Language :: Python :: 3.13",
+    "License :: OSI Approved :: MIT License",
+]
+
+# packages = [{ include = "*.py", from="src"}]
+
+[tool.poetry.dependencies]
+python = ">=3.8,<=3.13"
+pytz = "^2023.3.post1"
+python-dateutil = "^2.8.2"
+pandas = "^2.1.1"
+
+[tool.poetry.scripts]
+timecalc = 'gtimes.timecalc:main'
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+
+[repositories]
+
+[tool.poetry-dynamic-versioning]
+enable = true
+vcs = "git"
+style = "semver"
+
+[project]
+dependencies = ["mkdocstrings[python]>=0.18"]
+
+
+# authors = [
+#   {name = "Benedikt Gunnar Ófeigsson", email = "bgo@vedur.is"},
+#   {name = "Maria Fernanda Gonzalez", email = "mariagr@vedur.is"},
+# ]
+# maintainers = [
+#   {name = "Benedikt Gunnar Ófeigsson", email = "bgo@vedur.is"}
+#

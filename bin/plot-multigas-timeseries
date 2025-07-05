@@ -1,0 +1,184 @@
+#!/usr/bin/pythona
+# -*- coding: utf-8 -*-
+
+import datetime as dt
+import argparse
+import sys, os, traceback
+
+
+#from gtimes.timefunc import TimefromYearf, currTime, TimetoYearf
+from gtimes.timefunc import currDatetime
+import cparser as cp
+import timesmatplt.gasmatplt as gp 
+
+
+## functions
+def tryTimes(sta, **kwargs):
+    """
+     Catching exceptions from gp.plotTime
+    """
+
+    try: # Trying to plot
+        print "%s Plotting" % sta
+        gp.plotTime(sta, **kwargs)
+        print "plotted %s using: %s" % (sta,  kwargs['special'])
+
+    except IndexError, e:
+        top = traceback.extract_stack()[-1]
+        errorstr = "%s: %s: " % (sta, kwargs['special'])
+        errorstr += ", ".join([type(e).__name__, os.path.basename(top[0]), str(top[1]), "For station %s" % sta])
+        print >>sys.stderr, errorstr 
+
+    except:
+        traceback.print_exc()
+        #print >>sys.stderr, top
+        print >>sys.stderr, "Unexpected error: %s during processing of %s" % (sys.exc_info()[0], sta)
+         
+
+def exit_gracefully(signum, frame):
+    ''' Exit gracefully on Ctrl-C '''
+
+    current_func = sys._getframe().f_code.co_name + '() >> '
+
+    # restore the original signal handler as otherwise evil things will happen
+    # in raw_input when CTRL+C is pressed, and our signal handler is not re-entrant
+    signal.signal(signal.SIGINT, original_sigint)
+
+    try:
+        if raw_input("\nReally quit? (y/n)> ").lower().startswith('y'):
+            sys.exit(1)
+
+    except KeyboardInterrupt:
+        print 'Ok ok, quitting'
+        sys.exit(1)
+
+    # restore the exit gracefully handler here
+    signal.signal(signal.SIGINT, exit_gracefully)
+
+    # Method borrowed from:
+    # http://stackoverflow.com/questions/18114560/python-catch-ctrl-c-command-prompt-
+
+####    ------------------------------------------------   ####
+
+# Main
+def main():
+    """
+
+    """
+
+
+    # date to use defaults to today ----
+    dstr="%Y%m%d" # Default input string
+
+    #initialising  few variables
+    start = end = None
+    eventDict={}
+    save_allow = ['eps']
+    special_allow = ['all', '90d', 'year', 'full', 'fixedstart', 'test']
+
+    parser = argparse.ArgumentParser(description='Plot tool for Multigas time series.', epilog='For any issues regarding this program or gas issues, contact Benni, gsm: 847 4985, email: bgo@vedur.is, Fjalar email: fjalar@vedur.is or Melissa email: melissa@vedur.is')
+    
+    parser.add_argument('Stations',nargs='+', 
+            help='List of stations')
+    parser.add_argument('--events',nargs='+', default=None,  
+            help='list of individual events to add')
+    parser.add_argument('--eventf',nargs='?',  type=argparse.FileType('r'), default=None, const=sys.stdin , 
+            help='read in a list of events from a file: defaults to stdin')
+    parser.add_argument('-s','--start', type=str , default=None, 
+            help='Start of plot')
+    parser.add_argument('-e','--end', type=str , default=None, 
+            help='End of plot')
+    parser.add_argument('-D', type=int , default=0, 
+            help='Number of days to shift the given day positive subracts negativ adds')
+    parser.add_argument('--save', type=str, nargs='?', default=None, const ='eps', choices=save_allow,  
+            help='save figure to a file defaults to postscript (eps)')
+    parser.add_argument('--fix',  action='store_true', 
+            help='plot strictly the period specified, regardless of the data')
+    parser.add_argument('--frfile',  action='store_true', 
+            help='get the data from file')
+    parser.add_argument('--dfile', type=str, nargs='?', default=None,   
+            help='file containing the data. defaultst to \"station-multigas.dat\" where station is the station name')
+    parser.add_argument('--ylim',  type=int, default=[], nargs='+',
+            help="set limit for y-axis: list of one or two numbers in mm. " +
+                 "One number x will expand the y axis by x mm in each direciton. "  +
+                 "Two numbers will give absolute lower and upper boundary of the y-axis")
+    parser.add_argument('--special', type=str , default=None, choices=special_allow, 
+            help='for routine plots: whole time series (all), One year long (year), ninety days (90d)')
+    parser.add_argument('-d','--figDir', type=str ,nargs='?', default = "", const = cp.Parser().getPostprocessConfig()['figDir'], 
+            help='Figure save directory')
+    parser.add_argument('-i','--Dir', type=str ,nargs='?', default = "", const = cp.Parser().getPostprocessConfig()['totPath'], 
+            help='Time series input directory')
+    parser.add_argument('-t',  action='store_true', 
+            help='join gamit pre and rap time series')
+
+
+    args = parser.parse_args()
+    print args.events
+
+    # processing command line arguments --------------
+    if args.fix or args.D: # set the end date as yesterday
+        end = currDatetime(-1)
+        
+    # defining sub-periods to plot, 'full'
+    if args.start: # start the plot at
+       start = dt.datetime.strptime(args.start,dstr)
+    if args.end: # end the plot at
+        end = dt.datetime.strptime(args.end,dstr)
+
+    if args.D:
+       start = currDatetime(days=-args.D, refday=end)
+
+    if args.eventf: # reading a list of events from a file or stdin
+        eventDict.update( dict( [ [ line.split(',')[0], line.split(',')[1:] ] for line in args.eventf.read().splitlines() ] ) ) 
+
+    if args.events: # adding individual events from the command line
+        eventDict.update( dict( [ [ event.split(',')[0], event.split(',')[1:] ] for event in args.events ] ) )
+   
+
+
+    # preparing the args for plot function
+    kwargs = vars(args) 
+    kwargs['start'] = start
+    kwargs['end'] = end
+    kwargs['events'] = eventDict
+
+    stations = args.Stations # station list
+    del(kwargs['Stations'])
+    del(kwargs['eventf'])
+    del(kwargs['D'])
+
+    
+    if "all" in stations: # geting a list of all the GPS stations
+        stations = [ stat['station']['id'] for stat in cp.Parser().getStationInfo() ]
+
+    # ------------------------
+
+    if args.t: # join GPS time series
+        for sta in statlist:
+                tp.compGlobkTimes(sta)
+
+    del(kwargs['t'])
+
+
+
+    # plotting
+    if not(args.special == "all" ) :
+        for sta in stations:
+            tryTimes( sta, **kwargs )
+
+    else:
+        
+        del(kwargs['special'])
+        del special_allow[0]
+        for special in special_allow:
+            for sta in stations:
+                tryTimes( sta, special=special, **kwargs)
+
+if __name__=="__main__":
+    
+    import signal 
+    # This is used to catch Ctrl-C exits
+    original_sigint = signal.getsignal(signal.SIGINT)
+    signal.signal(signal.SIGINT, exit_gracefully)
+
+    main()

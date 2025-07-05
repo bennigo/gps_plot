@@ -1,0 +1,284 @@
+#!/usr/bin/pythona
+# -*- coding: iso-8859-15 -*-
+### # -*- coding: utf-8 -*-
+
+import matplotlib as mpl
+import datetime as dt
+import numpy as np
+import argparse
+import sys, os
+
+import timesmatplt.timesmatplt as tplt
+import timesfunc.timesfunc as gtf
+
+#from gtimes.timefunc import TimefromYearf, currTime, TimetoYearf
+from gtimes.timefunc import currYearfDate, toDatetimel, TimefromYearf, currDate, currDatetime
+import cparser as cp
+
+import geofunc.geo as geo
+import geofunc.geofunc as gf
+
+
+
+def main():
+
+
+    # date to use defaults to today ----
+    dstr="%Y%m%d" # Default input string
+    outpstr="%a, %d. %b %Y" # Default output string
+
+    #initialising  few variables
+    fstartDate=None
+    fendDate=None
+    startDate = tstartDate=None
+    endDate = tendDate=None
+    events=[]
+    eventDict={}
+
+    parser = argparse.ArgumentParser(description='Plot GPS time series.')
+    
+    parser.add_argument('Stations',nargs='+', help='List of stations')
+    parser.add_argument('--events',nargs='+',  help='list of individual events to add')
+    parser.add_argument('--eventf',nargs='?',  type=argparse.FileType('r'), default=None, const=sys.stdin , help='read in a list of events from a file:\n defaults to stdin')
+    #parser.add_argument('-o', type=int, nargs=3, default=[6,6,11], help='Uncertainty level to remove')
+    parser.add_argument('-s','--start', type=str , default=None, help='Start of plot')
+    parser.add_argument('-e','--end', type=str , default=None, help='End of plot')
+    parser.add_argument('-D', type=int , default=0, help='Number of days to shift the given day positive subracts negativ adds')
+    #parser.add_argument('-f','--fitperiod', type=str , nargs=2, default=None, help='reference period for detrending')
+    #parser.add_argument('--detrend',  action='store_true', help='Detrend the time series')
+    parser.add_argument('--eps',  action='store_true', help='save file as EPS')
+    parser.add_argument('--fix',  action='store_true', help='plot strictly the period specified, regardless of the data')
+    parser.add_argument('--msites',  action='store_true', help='Plot multible time series on a plot')
+    #parser.add_argument('--plate',  action='store_true', help='remove plate velocity')
+    parser.add_argument('--ref',  type=str, default='itrf2008', choices=['plate', 'detrend'], help='Reference frame: defaults to itrf2008, remove plate  velocity (plate), Detrend the time series (detrend)')
+    parser.add_argument("-f", default=dstr, type=str,
+            help="Format of the time string passed in the command line. If absent, -d defaults to ""%%Y-%%m%%%%m""."   +
+                 "Special formating: ""yearf"" -> fractional year ""w-dow"" -> GPS Week-Day of Week." +
+                 "See datetime documentation for formating")
+    parser.add_argument('--ylim',  type=int, default=[], nargs='+',
+            help="set limit for y-axis: list of one or two numbers in mm. " +
+                 "One number x will expand the y axis by x mm in each direciton. "  +
+                 "Two numbers will give absolute lower and upper boundary of the y-axis")
+    parser.add_argument('--special', type=str , default=None, choices=['all', 'year', '90d'], help='for routine plots: whole time series (all), One year long (year), ninety days (90d)')
+    parser.add_argument('-d','--figDir', type=str ,nargs='?', default = "", const = cp.Parser().getPostprocessConfig()['figDir'], help='Figure save directory')
+
+
+    args = parser.parse_args()
+
+
+    # processing command line arguments --------------
+    print args
+    stations = args.Stations # station list
+    saveEPS=args.eps # saving as EPS or not
+    msites=args.msites # saving as EPS or not
+    #detrend=args.detrend # Desiting if to detrend
+    #plate = args.plate
+    days=args.D
+    fix=args.fix
+    ylim = args.ylim
+    special = args.special
+    ref = args.ref
+    figDir = args.figDir
+
+    
+        
+
+
+    # The backend
+    if saveEPS:
+        mpl.use('ps')
+    else:
+        mpl.use('WebAgg')
+    
+    # Needs to be imported after the backend is defined
+    import matplotlib.pyplot as plt
+
+    if fix or args.D: # set the end date as yesterday
+        tendDate = currDatetime(-1)
+        
+    # defining sub-periods to plot
+    if args.start: # start the plot at
+        tstartDate = dt.datetime.strptime(args.start,dstr)
+        fstartDate = currYearfDate(refday=tstartDate)
+    if args.end: # end the plot at
+        tendDate = dt.datetime.strptime(args.end,dstr)
+        fendDate = currYearfDate(refday=tendDate)
+
+    if args.D:
+       tstartDate = currDatetime(days=-args.D, refday=tendDate)
+       fstartDate = currYearfDate(refday=tstartDate)
+       
+    # ------------------------
+
+    if fix:
+        startDate = tstartDate
+        endDate = tendDate
+
+    if args.eventf: # reading a list of events from a file or stdin
+        eventDict = update( dict( [ [ line.split(',')[0], line.split(',')[1:] ] for line in args.eventf.read().splitlines() ] ) ) 
+        events = sorted(eventDict.keys())
+
+    if args.events: # adding individual events from the command line
+        eventDict.update( dict( [ [ event.split(',')[0], event.split(',')[1:] ] for event in args.events ] ) )
+        events = sorted(eventDict.keys())
+    
+
+        dstr=args.f
+
+    # -----------------------------------------
+    #outlier = [6,6,11]
+    #filt = 1
+
+
+    # Target function
+    fitfunc = lambda p, x: x + p[0]*x + p[1]*np.cos(2*np.pi*x) + p[2]*np.sin(2*np.pi*x) + p[3]*np.cos(4*np.pi*x) + p[4]*np.sin(4*np.pi*x)
+    errfunc = lambda p, x, y: fitfunc(p, x) - y  # Distance to the target function
+    
+
+    if msites: # plotting multible time series on a single plot
+        
+        yearmin = None
+
+        fig = tplt.stdFrame()
+        prepdate = toDatetimel(events[0],dstr)
+        #prepdate=dt.datetime(2013,9,01,12)
+        #plt.rc('axes', color_cycle=['r', 'g', 'b', 'y'])
+        
+
+
+        for sta in stations:
+
+
+            print sta
+            yearf, data, Ddata = gtf.openGlobkTimes(sta)
+
+            yearf, data, Ddata = gtf.dPeriod(yearf,data,Ddata, fstartDate, fendDate )
+            yearf, data, Ddata = gtf.iprep(yearf,data,Ddata)
+    
+            if ref == "plate":
+                plateVel = gf.plateVelo([sta])
+                print plateVel*1000
+                data[0,:] = data[0,:] - plateVel[0,1]*1000*(yearf - yearf[0])
+                data[1,:] = data[1,:] - plateVel[0,0]*1000*(yearf - yearf[0])
+
+            
+            if ref == "detrend":
+                pN, pE, pU, pb = gtf.detrend(yearf, data, fitfunc, errfunc, sta)
+                pb_org = [pN, pE, pU]
+
+                for i in range(3):
+                    data[i] =  -errfunc(pb_org[i], yearf-yearf[0], data[i])
+        
+
+            yearf, data, Ddata = gtf.vshift(yearf,data,Ddata,refdate=prepdate,Period=-5)
+        
+            yearf = gtf.toord(yearf)
+            
+            if yearmin is None:
+                yearmin=yearf[0]
+                yearmax=yearf[-1]
+                extend = 0.025*(yearmax-yearmax)
+                [ fig.axes[i].set_xlim([yearmin-extend,yearmax+extend]) for i in range(3) ]
+            
+            if yearmin > yearf[0]:
+                yearmin = yearf[0]
+                extend = 0.025*(yearmax-yearmax)
+                [ fig.axes[i].set_xlim([yearmin-extend,yearmax+extend]) for i in range(3) ]
+
+            if yearmax < yearf[-1]:
+                yearmax = yearf[-1]
+                extend = 0.025*(yearmax-yearmax)
+                [ fig.axes[i].set_xlim([yearmin-extend,yearmax+extend]) for i in range(3) ]
+         
+            [fig.axes[i].plot(yearf,data[i], marker='o', linestyle='none', markersize=3.5, label=sta)  for i in range(3) ]
+        # -----------------
+
+        fig.axes[2].legend(loc=2, numpoints = 1)
+        if events:
+            tplt.addEvent(eventDict,fig,dstr)
+
+
+        if saveEPS:
+            tplt.saveFig("test","eps",fig)
+        else:
+            plt.show()
+
+
+    else: #plottin standard time series
+        # filtering and prepearing for ploting
+        for sta in stations:
+
+            print sta
+            yearf, data, Ddata = gtf.openGlobkTimes(sta)
+
+            yearf, data, Ddata = gtf.dPeriod(yearf,data,Ddata, fstartDate, fendDate )
+            yearf, data, Ddata = gtf.iprep(yearf,data,Ddata,uncert=15)
+            
+            
+            if ref == "plate":
+                plateVel = gf.plateVelo([sta])
+                print ref
+                print plateVel*1000
+                data[0,:] = data[0,:] - plateVel[0,1]*1000*(yearf - yearf[0])
+                data[1,:] = data[1,:] - plateVel[0,0]*1000*(yearf - yearf[0])
+
+
+            if ref == "detrend":
+                print ref
+                pN, pE, pU, pb = gtf.detrend(yearf, data, fitfunc, errfunc, sta)
+                pb_org = [pN, pE, pU]
+
+                for i in range(3):
+                    data[i] =  -errfunc(pb_org[i], yearf-yearf[0], data[i])
+        
+
+            
+
+            # creating the graph title
+
+            if ref == "plate":
+                plateName = gf.plateFullname(gf.plateDict()[sta])
+                refTitle = plateName
+            elif ref == "detrend":
+                refTitle = "Detrended"
+            else:
+                refTitle = ref.upper()
+
+            firstpoint = TimefromYearf( yearf[0])
+            lastpoint = TimefromYearf( yearf[-1])
+            
+            # title string list [Title, Subtitle]
+            Title = tplt.makelatexTitle( sta, lastpoint, ref=refTitle )
+            # ploting 
+            fig = tplt.devTimesPlot(yearf, data, Ddata, Title=Title, startDate=startDate, endDate=endDate, ylim=ylim)
+            
+            if events:
+                tplt.addEvent(eventDict,fig,dstr)
+               
+
+            if saveEPS: # saving an EPS file
+                # filenam and path
+                filend="-%s" % (ref,)
+
+                if special == "year":
+                    filend += "-year"
+                elif special == "90d":
+                    filend += "-90d"
+                elif special == "all":
+                    filend += "-all"
+
+                else:
+                    filend += "_%s-%s" % ( firstpoint.strftime("%Y%m%d") , lastpoint.strftime("%Y%m%d") ) 
+
+            
+                figFile = sta + filend
+                fileName = os.path.join(figDir,figFile)
+                ##-------------------------------------------
+
+                tplt.saveFig(fileName,"eps",fig)
+            else:
+                plt.show()
+
+
+if __name__=="__main__":
+     main()
