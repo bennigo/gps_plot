@@ -7,12 +7,12 @@ import os
 import sys
 import traceback
 
-import cparser as cp
+import gps_parser as cp
 
 # from gtimes.timefunc import TimefromYearf, currTime, TimetoYearf
 from gtimes.timefunc import currDatetime
 
-import timesmatplt.timesmatplt as tplt
+import gps_plot.timesmatplt as tplt
 
 
 # functions
@@ -78,6 +78,7 @@ def exit_gracefully(signum, frame):
 def main():
     """ """
 
+    config = cp.ConfigParser()
     # date to use defaults to today ----
     dstr = "%Y%m%d"  # Default input string
 
@@ -171,7 +172,7 @@ def main():
         type=str,
         nargs="?",
         default="",
-        const=cp.Parser().getPostprocessConfig()["figDir"],
+        const=config.getPostprocessConfig("figDir"),
         help="Figure save directory",
     )
     parser.add_argument(
@@ -179,7 +180,7 @@ def main():
         "--Dir",
         type=str,
         nargs="?",
-        default=cp.Parser().getPostprocessConfig()["totPath"],
+        default=config.getPostprocessConfig("totPath"),
         help="Time series input directory",
     )
     parser.add_argument(
@@ -228,7 +229,7 @@ def main():
     del kwargs["D"]
 
     if "all" in stations:  # geting a list of all the GPS stations
-        stations = [stat["station"]["id"] for stat in cp.Parser().getStationInfo()]
+        stations = config.getStationInfo()
 
     # ------------------------
 
@@ -244,9 +245,7 @@ def main():
             tryTimes(sta, **kwargs)
 
     else:
-
         if args.special == "all" and args.ref == "all":
-
             del kwargs["ref"]
             del kwargs["special"]
             del ref_allow[0]
@@ -258,7 +257,6 @@ def main():
                         tryTimes(sta, ref=ref, special=special, **kwargs)
 
         elif args.special == "all" and not args.ref == "all":
-
             del kwargs["special"]
             del special_allow[0]
 
@@ -267,7 +265,6 @@ def main():
                     tryTimes(sta, special=special, **kwargs)
 
         else:
-
             del kwargs["ref"]
             del ref_allow[0]
 
@@ -277,7 +274,6 @@ def main():
 
 
 if __name__ == "__main__":
-
     import signal
 
     # This is used to catch Ctrl-C exits

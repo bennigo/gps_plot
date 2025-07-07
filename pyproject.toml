@@ -1,16 +1,19 @@
 [project]
-name = "gps-plot"
+name = "gps_plot"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 authors = [
-    { name = "bgo", email = "bgo@vedur.is" }
+    { name = "Benedikt Gunnar Ófeigsson", email = "bgo@vedur.is" },
+    { name = "Maria Fernanda Gonzalez", email = "mariagr@vedur.is" },
 ]
+maintainers = [{ name = "Benedikt Gunnar Ófeigsson", email = "bgo@vedur.is" }]
 requires-python = ">=3.13"
-dependencies = []
+dependencies = ["highlight-text>=0.2", "matplotlib>=3.10.3", "tornado>=6.5.1"]
 
 [project.scripts]
-gps-plot = "gps_plot:main"
+gps_plot = "gps_plot:main"
+plot-gps-timeseries = "gps_plot.plot_gps_timeseries:main"
 
 [build-system]
 requires = ["hatchling"]

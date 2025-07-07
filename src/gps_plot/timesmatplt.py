@@ -37,25 +37,29 @@ import sys
 import warnings
 from datetime import timedelta
 
-import geo_dataread.gps_read as gdrgps
+import gps_parser as cp
+
+import geo_dataread.gps_read as gpsr
 import geofunc.geofunc as gf
 
 # import gpstime
 import matplotlib as mpl
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
-from geo_dataread.gps_read import convGlobktopandas, toDateTime
-from gtimes.timefunc import currDate, currDatetime, currYearfDate, toDatetimel
-from matplotlib import transforms
+import matplotlib.image as image
 
 # import matplotlib.colors as mcolors
 # import matplotlib.image as image
 # from scipy.spatial.distance import euclidean
-
 # extra stuff
-
 # from timesfunc.timesfunc import convGlobktopandas, toDateTime
+# from matplotlib.backends.backend_pgf import FigureCanvasPgf
+# mpl.backend_bases.register_backend("pdf", FigureCanvasPgf)
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from geo_dataread.gps_read import convGlobktopandas, toDateTime
+from gtimes.timefunc import currDate, currDatetime, currTime, currYearfDate, toDatetimel
+from highlight_text import ax_text, fig_text
+from matplotlib import transforms
 
 
 def plotTime(
@@ -89,20 +93,15 @@ def plotTime(
     # print "events: ", events
     # print "fix: ", fix
 
-    # importing stuff
-    # standard library
-
     # The backend of matplotlib
     if save == "eps":
         mpl.use("ps")
     elif save == "pdf":
         mpl.use("pdf")
-        # from matplotlib.backends.backend_pgf import FigureCanvasPgf
-        # mpl.backend_bases.register_backend("pdf", FigureCanvasPgf)
     else:
         mpl.use("WebAgg")
     # Needs to be imported after the backend is defined
-    import matplotlib.pyplot as plt
+    # import matplotlib.pyplot as plt
 
     fstart = fend = None
 
@@ -145,7 +144,7 @@ def plotTime(
     else:
         refTitle = ref.upper()
 
-    yearf, data, Ddata, offset = getData(
+    yearf, data, Ddata, offset = gpsr.getData(
         sta, fstart=fstart, fend=fend, ref=ref, Dir=Dir, tType=tType, uncert=uncert
     )
     Pdata = convGlobktopandas(yearf, data, Ddata)
@@ -169,7 +168,7 @@ def plotTime(
     )
 
     if tType == "JOIN":
-        yearf, data, Ddata, offset8 = getData(
+        yearf, data, Ddata, offset8 = gpsr.getData(
             sta,
             fstart=fstart,
             fend=fend,
@@ -383,7 +382,7 @@ def stdTimesPlot(
         fig, Figure object
     """
 
-    x = pd.to_datetime(toDateTime(x))
+    # x = pd.to_datetime(toDateTime(x))
     yesterdaybool = x[-1].date() == currDate(warnp)
 
     # plotting
@@ -572,9 +571,6 @@ def convIcelCh(string):
 def inpLogo(fig, Logo=None):
     """ """
 
-    import matplotlib.image as image
-    import matplotlib.pyplot as plt
-
     # asp = 0.6948051948051948
     # asp = 0.93 # Image aspect ratio
     asp = 0.45  # Image aspect ratio
@@ -599,9 +595,7 @@ def makelatexTitle(sta, lastData, ref="ITRF2008", warnp=-1):
     Create a Title for standard GPS time series plot using latex package
     """
 
-    import cparser as cp
-    from gtimes.timefunc import currDate, currTime
-
+    config = cp.ConfigParser()
     Title = []
 
     lastpoint = currDate(refday=lastData, String="Last datapoint: %d %b %Y")
@@ -617,7 +611,8 @@ def makelatexTitle(sta, lastData, ref="ITRF2008", warnp=-1):
     # fetcing the station full name
     try:
         # stName = cp.parseOne(STA,staConFilePath)['station']['name']
-        stName = cp.Parser().getStationInfo(sta)["station"]["name"]
+        # stName = config.getStationInfo(sta)["name"]
+        stName = config.get_config(sta, "station_name")
     except:
         stName = sta
     stName = convLatex(stName)
@@ -678,10 +673,6 @@ def makeTitle(sta, lastData, ref="ITRF2008", warnp=-1):
     """
     Create a Title for standard GPS time series plot using latex package
     """
-
-    import cparser as cp
-    from gtimes.timefunc import currDate, currTime
-    from highlight_text import ax_text, fig_text
 
     text = (
         "The iris dataset contains 3 species:\n<setosa>, <versicolor>, and <virginica>"
