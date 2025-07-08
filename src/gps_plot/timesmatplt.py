@@ -382,8 +382,8 @@ def stdTimesPlot(
         fig, Figure object
     """
 
-    # x = pd.to_datetime(toDateTime(x))
-    yesterdaybool = x[-1].date() == currDate(warnp)
+    x = pd.to_datetime(toDateTime(x))
+    yesterdaybool = x[-1] == currDate(warnp)
 
     # plotting
     fig, axes = stdFrame(Ylabel, Title)
